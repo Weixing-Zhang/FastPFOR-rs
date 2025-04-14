@@ -12,6 +12,7 @@ fn main() {
         println!("cargo:rerun-if-changed=cpp");
         let lib_path = cmake::Config::new("cpp")
             .define("WITH_TEST", "OFF")
+            .cxxflag("-I/opt/homebrew/include")
             .build()
             .join("lib");
         let lib_path = lib_path.to_str().unwrap();
@@ -22,6 +23,7 @@ fn main() {
         cxx_build::bridge("src/cpp/mod.rs")
             .include("cpp/headers")
             .include("src/cpp")
+            .include("/opt/homebrew/include")
             .std("c++14")
             .compile("fastpfor_bridge");
 
