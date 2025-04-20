@@ -1,7 +1,66 @@
 #![cfg(feature = "rust")]
 
 use std::io::Cursor;
-use fastpfor::rust::{FastPFOR, Integer, DEFAULT_PAGE_SIZE, BLOCK_SIZE_128};
+use fastpfor::rust::{Codec, FastPFOR, VariableByte, JustCopy, Integer, FastPForResult, DEFAULT_PAGE_SIZE, BLOCK_SIZE_128};
+
+
+/// Dynamically create a codec based on user input
+fn create_codec(name: &str) -> Codec {
+    match name {
+        "fastpfor" => FastPFOR::new(DEFAULT_PAGE_SIZE, BLOCK_SIZE_128).into(),
+        "variablebyte" => VariableByte::new().into(),
+        "justcopy" => JustCopy::new().into(),
+        _ => panic!("Unknown codec type: {}", name),
+    }
+}
+
+/// Compress and decompress using a codec selected at runtime
+fn compress_decompress_with(codec_name: &str, input: &[u32]) -> FastPForResult<Vec<u32>> {
+    let mut codec = create_codec(codec_name);
+
+    let mut compressed = vec![0u32; input.len() * 2]; // over-allocate
+    let mut compressed_offset = Cursor::new(0u32);
+    let mut input_offset = Cursor::new(0u32);
+
+    codec.compress(
+        input,
+        input.len() as u32,
+        &mut input_offset,
+        &mut compressed,
+        &mut compressed_offset,
+    )?;
+
+    let compressed_len = compressed_offset.position() as usize;
+
+    let mut decompressed = vec![0u32; input.len()]; // assume exact output
+    let mut decompress_offset = Cursor::new(0u32);
+    let mut compressed_read_offset = Cursor::new(0u32);
+
+    codec.uncompress(
+        &compressed[..compressed_len],
+        compressed_len as u32,
+        &mut compressed_read_offset,
+        &mut decompressed,
+        &mut decompress_offset,
+    )?;
+
+    Ok(decompressed)
+}
+
+
+#[test]
+fn test_dynamic_codec_switching() {
+    let input: Vec<u32> = (0..BLOCK_SIZE_128).collect(); 
+
+    for codec in &["fastpfor", "variablebyte", "justcopy"] {
+        let result = compress_decompress_with(codec, &input)
+            .expect(&format!("Codec '{}' failed", codec));
+
+        assert_eq!(result[..input.len()], input, "Mismatch using codec '{}'", codec);
+        println!("✅ {} passed! Output: {:?}", codec, result);
+    }
+}
+
 
 #[test]
 fn simple_fastpfor_test() {
