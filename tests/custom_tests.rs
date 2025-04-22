@@ -65,7 +65,7 @@ fn test_dynamic_codec_switching() {
 #[test]
 fn simple_fastpfor_test() {
     let input: Vec<u32> = (0..BLOCK_SIZE_128).collect();
-    let mut output: Vec<u32> = vec![0; input.len()]; 
+    let mut output: Vec<u32> = vec![0; input.len()*2]; 
     let mut decoded: Vec<u32> = vec![0; input.len()];
     let mut input_offset = Cursor::new(0u32);
     let mut output_offset = Cursor::new(0u32);
@@ -114,7 +114,7 @@ fn simple_fastpfor_test() {
 #[test]
 fn large_data_fastpfor_test() {
     let input: Vec<u32> = (0..(DEFAULT_PAGE_SIZE*1024)).collect();
-    let mut output: Vec<u32> = vec![0; input.len()]; 
+    let mut output: Vec<u32> = vec![0; input.len()*2]; 
     let mut decoded: Vec<u32> = vec![0; input.len()];
     let mut input_offset = Cursor::new(0u32);
     let mut output_offset = Cursor::new(0u32);
