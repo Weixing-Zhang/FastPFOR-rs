@@ -140,7 +140,11 @@ impl FastPFOR {
         let mut tmp_output_offset = output_offset.position() as u32;
 
         // Data pointers to 0
-        self.data_pointers.fill(0);
+        // Reset data pointers which are used for trakcing the current write position
+        // in the data_to_be_packed array
+        self.data_pointers.fill(0); 
+        
+        // Metadata and exception positions/values are written temporarily        
         self.bytes_container.clear();
 
         let mut tmp_input_offset = input_offset.position() as u32;
@@ -150,6 +154,9 @@ impl FastPFOR {
             let tmp_best_b = self.bestbbestcexceptmaxb[0];
             self.bytes_container.put(self.bestbbestcexceptmaxb[0] as u8);
             self.bytes_container.put(self.bestbbestcexceptmaxb[1] as u8);
+            
+            // Handling exceptional values
+            // bestbbestcexceptmaxb[0][1][2] stand for the best bit, num of exceps, and maxb
             if self.bestbbestcexceptmaxb[1] > 0 {
                 self.bytes_container.put(self.bestbbestcexceptmaxb[2] as u8);
                 let index = self.bestbbestcexceptmaxb[2] - self.bestbbestcexceptmaxb[0];
@@ -174,6 +181,8 @@ impl FastPFOR {
                     }
                 }
             }
+
+            // Handler the rest
             for k in (0..self.block_size).step_by(32) {
                 bitpacking::fast_pack(
                     input,
