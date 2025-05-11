@@ -64,6 +64,34 @@ impl Skippable for FastPFOR {
     }
 }
 
+
+/// FastPFOR encoder/decoder for compressing `u32` arrays using bitpacking + exceptions.
+///
+/// # Compressed Format Layout
+///
+/// Each encoded page is stored in the output buffer as a flat `Vec<u32>`, structured as:
+///
+/// ```text
+/// [0]              → u32: Page header (number of u32s used by this page)
+/// [1..N]           → Bitpacked values (each block compressed using best_b bits per value)
+/// [N]              → u32: Byte size of metadata (`bytes_container`)
+/// [N+1..M]         → Metadata for each block (in `bytes_container`):
+///                     - best_b:    u8
+///                     - num_excep: u8
+///                     - max_b:     u8 (only if num_excep > 0)
+///                     - exception positions (u8[])
+/// [M]              → u32: Bitmap indicating which `data_to_be_packed[k]` buckets were used
+/// [M+1..]          → For each `k` in 2..=32 where exceptions occurred:
+///                     - [count]       → u32: number of exception values
+///                     - [values...]   → packed using `bitpacking::fast_pack`, with `k` bits/value
+/// ```
+///
+/// # Notes
+/// - The `data_pointers` vector is used as internal cursor tracking and is **not serialized**.
+/// - Blocks are processed in groups of 32 values.
+/// - `best_b` is chosen to minimize storage cost; exceptions are stored when values exceed `2^best_b - 1`.
+///
+/// See [`encode_page`] and [`decode_page`] for the low-level format details.
 impl Integer<u32> for FastPFOR {
     fn compress(
         &mut self,
@@ -137,6 +165,8 @@ impl FastPFOR {
     ) {
         let header_pos = output_offset.position() as usize;
         output_offset.increment();
+        
+        // Track the current write position by u32 which is one value
         let mut tmp_output_offset = output_offset.position() as u32;
 
         // Data pointers to 0
@@ -188,7 +218,8 @@ impl FastPFOR {
                 }
             }
 
-            // Till here: 2025-05-11
+            // fast_pack is designed to operate on 32-element chunks at a time 
+            // Compress data to u32 using best_bit
             for k in (0..self.block_size).step_by(32) {
                 bitpacking::fast_pack(
                     input,
@@ -197,6 +228,8 @@ impl FastPFOR {
                     tmp_output_offset as usize,
                     tmp_best_b as u8,
                 );
+
+                // Given the chunk size of 32, 32 values * tmp_best_b / 32 
                 tmp_output_offset += tmp_best_b;
             }
             tmp_input_offset += self.block_size;
