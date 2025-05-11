@@ -160,6 +160,11 @@ impl FastPFOR {
             if self.bestbbestcexceptmaxb[1] > 0 {
                 self.bytes_container.put(self.bestbbestcexceptmaxb[2] as u8);
                 let index = self.bestbbestcexceptmaxb[2] - self.bestbbestcexceptmaxb[0];
+                
+                // data_pointers[index as usize] is used to track the current write position
+                // in the data_to_be_packed array
+                // The following block of code ensures that the data_to_be_packed array is large enough
+                // Resize it if necessary
                 if self.data_pointers[index as usize] + self.bestbbestcexceptmaxb[1] as usize
                     >= self.data_to_be_packed[index as usize].len()
                 {
@@ -170,6 +175,8 @@ impl FastPFOR {
                     new_size = helpers::greatest_multiple(new_size + 31, 32);
                     self.data_to_be_packed[index as usize].resize(new_size as usize, 0);
                 }
+
+                // Store the exceptional values in the data_to_be_packed array
                 for k in 0..self.block_size {
                     if (input[(k + tmp_input_offset) as usize] >> self.bestbbestcexceptmaxb[0]) != 0
                     {
@@ -182,7 +189,7 @@ impl FastPFOR {
                 }
             }
 
-            // Handler the rest
+            // Till here: 2025-05-11
             for k in (0..self.block_size).step_by(32) {
                 bitpacking::fast_pack(
                     input,
@@ -195,6 +202,7 @@ impl FastPFOR {
             }
             tmp_input_offset += self.block_size;
         }
+        
         input_offset.set_position(u64::from(tmp_input_offset));
         output[header_pos] = tmp_output_offset - header_pos as u32;
         let byte_size = self.bytes_container.position();
