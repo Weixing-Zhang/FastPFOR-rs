@@ -140,11 +140,10 @@ impl FastPFOR {
         let mut tmp_output_offset = output_offset.position() as u32;
 
         // Data pointers to 0
-        // Reset data pointers which are used for trakcing the current write position
-        // in the data_to_be_packed array
+        // How many exception values you've added to data_to_be_packed[index]
         self.data_pointers.fill(0); 
         
-        // Metadata and exception positions/values are written temporarily        
+        // Store the exceptional values in the data_to_be_packed array       
         self.bytes_container.clear();
 
         let mut tmp_input_offset = input_offset.position() as u32;
