@@ -155,6 +155,34 @@ impl FastPFOR {
         }
     }
 
+    /// Write Order in `output[]` during Compression:
+    ///
+    /// ✅ Header Placeholder (1 × u32)
+    /// - At the very start — reserved space for page size.
+    ///
+    /// ✅ Bitpacked Normal Values
+    /// - These are the main values from input that fit in `best_b` bits:
+    ///   bitpacking::fast_pack(...)
+    /// - They're written immediately as you loop through blocks:
+    ///   for k in (0..self.block_size).step_by(32)
+    /// - ➜ These go right after the header, starting at `output_offset`.
+    ///
+    /// ✅ Metadata Size (1 × u32)
+    /// - Stores the byte size of the metadata buffer (`bytes_container`):
+    ///   output[tmp_output_offset] = byte_size;
+    ///
+    /// ✅ Metadata Contents (n × u32)
+    /// - From `bytes_container`, after padding and flip:
+    ///   bytes_container.as_int_buffer().get(...)
+    ///
+    /// ✅ Bitmap of Exception Buckets (1 × u32)
+    /// - Tells the decoder which `data_to_be_packed[k]` are non-empty:
+    ///   output[tmp_output_offset] = bitmap;
+    ///
+    /// ✅ Exception Values
+    /// - For each `k ∈ 2..=32` if used:
+    ///   - Count of exceptions (1 × u32)
+    ///   - Packed values using: fast_pack(..., k as u8) 
     fn encode_page(
         &mut self,
         input: &[u32],
@@ -235,14 +263,16 @@ impl FastPFOR {
             tmp_input_offset += self.block_size;
         }
 
-        // Till here: 2025-05-11 
+        // Logs the new position as the end of the current page
         input_offset.set_position(u64::from(tmp_input_offset));
         output[header_pos] = tmp_output_offset - header_pos as u32;
         let byte_size = self.bytes_container.position();
         while (self.bytes_container.position() & 3) != 0 {
             self.bytes_container.put(0);
         }
+
         // Output should have 3 position as 4
+        // Write the meta data to the output buffer
         output[tmp_output_offset as usize] = byte_size;
         tmp_output_offset += 1;
         let how_many_ints = self.bytes_container.position() / 4;
@@ -254,6 +284,8 @@ impl FastPFOR {
             how_many_ints as usize,
         );
         tmp_output_offset += how_many_ints;
+
+        // Writing the actual exceptional values
         let mut bitmap = 0;
         for k in 2..=32 {
             if self.data_pointers[k] != 0 {
